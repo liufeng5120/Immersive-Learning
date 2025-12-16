@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Immersive Learning</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- 头部 -->
+    <header class="header">
+      <div class="logo">
+        <img src="../icons/icon48.png" alt="logo" class="logo-icon">
+        <h1>Immersive Learning</h1>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="enableToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </header>
+
+    <!-- 统计卡片 -->
+    <div class="stats-card">
+      <div class="stat-item">
+        <span class="stat-value" id="todayWords">0</span>
+        <span class="stat-label">今日接触</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-value" id="totalWords">0</span>
+        <span class="stat-label">累计接触</span>
+      </div>
+    </div>
+
+    <!-- 难度控制 -->
+    <div class="control-section">
+      <div class="control-header">
+        <span class="control-label">接触强度</span>
+        <span class="control-value" id="difficultyValue">中等</span>
+      </div>
+      <input type="range" id="difficultySlider" min="1" max="5" value="3" class="slider-input">
+      <div class="slider-labels">
+        <span>轻松</span>
+        <span>挑战</span>
+      </div>
+    </div>
+
+    <!-- API 设置 -->
+    <div class="settings-section">
+      <div class="setting-item">
+        <label for="apiKey">API Key</label>
+        <input type="password" id="apiKey" placeholder="输入 API Key">
+      </div>
+      <div class="setting-item">
+        <label for="apiBaseUrl">API 地址</label>
+        <input type="text" id="apiBaseUrl" placeholder="留空使用默认: api.openai.com">
+      </div>
+      <div class="setting-item">
+        <label for="modelName">模型名称</label>
+        <input type="text" id="modelName" placeholder="留空使用默认: gpt-4o-mini">
+      </div>
+      <div class="setting-item toggle-item">
+        <label for="showOriginal">显示原文</label>
+        <label class="switch small">
+          <input type="checkbox" id="showOriginal" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="setting-item">
+        <label for="excludedSites">排除网站</label>
+        <textarea id="excludedSites" placeholder="每行一个域名，如：&#10;localhost&#10;192.168.*.*" rows="3"></textarea>
+        <small class="setting-hint">支持通配符 *，默认排除局域网</small>
+      </div>
+      <button id="saveSettingsBtn" class="save-btn">保存设置</button>
+    </div>
+
+    <!-- 底部信息 -->
+    <footer class="footer">
+      <span>沉浸式学习</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
