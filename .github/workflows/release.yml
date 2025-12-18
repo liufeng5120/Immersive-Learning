@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+      - name: Create zip package
+        run: |
+          zip -r immersive-learning-v${{ steps.version.outputs.VERSION }}.zip . \
+            -x "*.git*" \
+            -x "*.DS_Store" \
+            -x "scripts/*" \
+            -x "*.zip" \
+            -x "node_modules/*" \
+            -x ".github/*"
+      
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          # 提取当前版本的更新日志
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          CONTENT=$(awk "/## \[${VERSION}\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md)
+          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
+          echo "$CONTENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Immersive Learning v${{ steps.version.outputs.VERSION }}
+          body: ${{ steps.changelog.outputs.NOTES }}
+          files: immersive-learning-v${{ steps.version.outputs.VERSION }}.zip
+          draft: false
+          prerelease: false
