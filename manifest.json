@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Immersive Learning",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "将英语词汇自然融入你浏览的中文内容，沉浸式提升英语能力",
   "permissions": [
     "storage",
