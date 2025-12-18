@@ -1,4 +1,4 @@
-/* Learn English Naturally - Popup Styles */
+/* Immersive Learning - Popup Styles */
 
 * {
     margin: 0;
@@ -7,7 +7,7 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
     color: #f1f5f9;
     min-width: 320px;
@@ -17,12 +17,22 @@ body {
     padding: 20px;
 }
 
-/* 头部 */
 .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+}
+
+.warning-banner {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    text-align: center;
 }
 
 .logo {
@@ -183,119 +193,24 @@ input:checked+.slider:before {
     color: #64748b;
 }
 
-/* 设置区域 */
-.settings-section {
+/* 设置按钮 */
+.settings-btn {
+    width: 100%;
+    padding: 12px;
     background: rgba(30, 41, 59, 0.5);
-    border-radius: 12px;
-    padding: 16px;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
     margin-bottom: 16px;
 }
 
-.setting-item {
-    margin-bottom: 12px;
-}
-
-.setting-item label {
-    display: block;
-    font-size: 12px;
-    color: #94a3b8;
-    margin-bottom: 6px;
-}
-
-.setting-item input {
-    width: 100%;
-    padding: 10px 12px;
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    color: #f1f5f9;
-    font-size: 13px;
-    outline: none;
-    transition: border-color 0.2s;
-}
-
-.setting-item input:focus {
+.settings-btn:hover {
+    background: rgba(59, 130, 246, 0.1);
     border-color: #3b82f6;
-}
-
-.setting-item input::placeholder {
-    color: #64748b;
-}
-
-.toggle-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.toggle-item label:first-child {
-    margin-bottom: 0;
-}
-
-.switch.small {
-    width: 36px;
-    height: 20px;
-}
-
-.switch.small .slider:before {
-    height: 14px;
-    width: 14px;
-}
-
-.switch.small input:checked+.slider:before {
-    transform: translateX(16px);
-}
-
-.save-btn {
-    width: 100%;
-    padding: 12px;
-    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
-    border: none;
-    border-radius: 8px;
-    color: #fff;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.save-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-}
-
-.save-btn:active {
-    transform: translateY(0);
-}
-
-/* Textarea */
-.setting-item textarea {
-    width: 100%;
-    padding: 8px 12px;
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    font-size: 12px;
-    font-family: inherit;
-    color: #f1f5f9;
-    resize: vertical;
-    min-height: 60px;
-}
-
-.setting-item textarea::placeholder {
-    color: #64748b;
-}
-
-.setting-item textarea:focus {
-    outline: none;
-    border-color: #3b82f6;
-}
-
-.setting-hint {
-    display: block;
-    font-size: 11px;
-    color: #94a3b8;
-    margin-top: 4px;
+    color: #60a5fa;
 }
 
 /* 底部 */
@@ -303,10 +218,9 @@ input:checked+.slider:before {
     text-align: center;
     font-size: 11px;
     color: #64748b;
-    padding-top: 8px;
 }
 
-/* 消息提示 */
+/* Toast */
 .toast {
     position: fixed;
     bottom: 20px;

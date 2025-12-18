@@ -1,20 +1,14 @@
-// Learn English Naturally - Popup Script
+// Immersive Learning - Popup Script
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // DOM 元素
   const enableToggle = document.getElementById('enableToggle');
   const difficultySlider = document.getElementById('difficultySlider');
   const difficultyValue = document.getElementById('difficultyValue');
-  const apiKeyInput = document.getElementById('apiKey');
-  const apiBaseUrlInput = document.getElementById('apiBaseUrl');
-  const modelNameInput = document.getElementById('modelName');
-  const showOriginalToggle = document.getElementById('showOriginal');
-  const excludedSitesInput = document.getElementById('excludedSites');
-  const saveBtn = document.getElementById('saveSettingsBtn');
   const todayWordsEl = document.getElementById('todayWords');
   const totalWordsEl = document.getElementById('totalWords');
+  const apiKeyWarning = document.getElementById('apiKeyWarning');
+  const settingsBtn = document.getElementById('settingsBtn');
 
-  // 难度级别文字
   const difficultyLabels = {
     1: '轻松',
     2: '简单',
@@ -23,20 +17,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     5: '挑战'
   };
 
+  let currentSettings = {};
+
+  // 检查是否有有效的 API 配置
+  function hasValidApiConfig(settings) {
+    if (settings.apiConfigs && settings.apiConfigs.length > 0 && settings.currentApiConfigId) {
+      const currentConfig = settings.apiConfigs.find(c => c.id === settings.currentApiConfigId);
+      return currentConfig && currentConfig.apiKey;
+    }
+    // 兼容旧版单配置
+    return !!settings.apiKey;
+  }
+
   // 加载设置
   async function loadSettings() {
     try {
       const result = await chrome.storage.local.get('settings');
-      const settings = result.settings || {};
+      currentSettings = result.settings || {};
       
-      enableToggle.checked = settings.enabled !== false;
-      difficultySlider.value = settings.difficulty || 3;
+      enableToggle.checked = currentSettings.enabled === true;
+      difficultySlider.value = currentSettings.difficulty || 3;
       difficultyValue.textContent = difficultyLabels[difficultySlider.value];
-      apiKeyInput.value = settings.apiKey || '';
-      apiBaseUrlInput.value = settings.apiBaseUrl || '';
-      modelNameInput.value = settings.modelName || '';
-      showOriginalToggle.checked = settings.showOriginal !== false;
-      excludedSitesInput.value = (settings.excludedSites || ['localhost', '127.0.0.1', '192.168.*.*', '10.*.*.*']).join('\n');
+      
+      apiKeyWarning.style.display = hasValidApiConfig(currentSettings) ? 'none' : 'block';
     } catch (e) {
       console.error('加载设置失败:', e);
     }
@@ -57,26 +60,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 保存设置
   async function saveSettings() {
-    const settings = {
-      enabled: enableToggle.checked,
-      difficulty: parseInt(difficultySlider.value),
-      apiKey: apiKeyInput.value.trim(),
-      apiBaseUrl: apiBaseUrlInput.value.trim(),
-      modelName: modelNameInput.value.trim(),
-      showOriginal: showOriginalToggle.checked,
-      excludedSites: excludedSitesInput.value.split('\n').map(s => s.trim()).filter(s => s)
-    };
-
     try {
-      await chrome.storage.local.set({ settings });
-      showToast('设置已保存');
+      await chrome.storage.local.set({ 
+        settings: { 
+          ...currentSettings,
+          enabled: enableToggle.checked,
+          difficulty: parseInt(difficultySlider.value)
+        } 
+      });
     } catch (e) {
       console.error('保存设置失败:', e);
-      showToast('保存失败');
     }
   }
 
-  // 显示提示
+  // 开关切换
+  async function handleToggle() {
+    if (enableToggle.checked && !hasValidApiConfig(currentSettings)) {
+      enableToggle.checked = false;
+      showToast('请先在设置中配置 API');
+      return;
+    }
+    currentSettings.enabled = enableToggle.checked;
+    await saveSettings();
+  }
+
   function showToast(message) {
     let toast = document.querySelector('.toast');
     if (!toast) {
@@ -86,24 +93,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     toast.textContent = message;
     toast.classList.add('show');
-    
-    setTimeout(() => {
-      toast.classList.remove('show');
-    }, 2000);
+    setTimeout(() => toast.classList.remove('show'), 2000);
   }
 
-  // 事件监听
-  enableToggle.addEventListener('change', saveSettings);
+  // 打开设置页
+  settingsBtn.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('popup/settings.html') });
+  });
+
+  enableToggle.addEventListener('change', handleToggle);
 
   difficultySlider.addEventListener('input', () => {
     difficultyValue.textContent = difficultyLabels[difficultySlider.value];
   });
 
-  difficultySlider.addEventListener('change', saveSettings);
+  difficultySlider.addEventListener('change', () => {
+    currentSettings.difficulty = parseInt(difficultySlider.value);
+    saveSettings();
+  });
 
-  saveBtn.addEventListener('click', saveSettings);
-
-  // 初始化
   await loadSettings();
   await loadStats();
 });
