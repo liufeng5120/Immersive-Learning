@@ -309,7 +309,7 @@
       if (!this.config.apiKey || !text) return [];
 
       const processText = text.length > 500 ? text.substring(0, 500) : text;
-      const cacheKey = `${this.config.direction}_${processText}`;
+      const cacheKey = `${this.config.direction}_${this.config.nativeLanguage}_${this.config.targetLanguage}_${processText}`;
 
       // 检查缓存
       const cached = await getSentenceCache(cacheKey);
