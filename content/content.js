@@ -359,8 +359,8 @@
     async getWordDetail(english, chinese, context) {
       if (!this.config.apiKey) return null;
 
-      // 缓存键包含语言对，避免不同语言间数据混淆
-      const cacheKey = `${english}_${this.config.nativeLanguage}_${this.config.targetLanguage}`;
+      // 缓存键包含中文释义和语言对，确保同一单词的不同释义使用不同缓存
+      const cacheKey = `${english}_${chinese}_${this.config.nativeLanguage}_${this.config.targetLanguage}`;
       const cached = await getWordDetailCache(cacheKey);
       if (cached) return cached;
 
