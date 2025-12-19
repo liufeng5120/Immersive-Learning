@@ -1,9 +1,9 @@
 /* Learn English Naturally - Content Styles */
 
-/* 英文词汇标记样式 - 紫色主题 */
+/* 英文词汇标记样式 - 继承原页面颜色 */
 .len-word {
-  color: #7c3aed;
-  background: linear-gradient(120deg, rgba(124, 58, 237, 0.1) 0%, rgba(124, 58, 237, 0.05) 100%);
+  color: inherit;
+  background: rgba(128, 128, 128, 0.08);
   border-radius: 3px;
   padding: 1px 4px;
   margin: 0 1px;
@@ -12,13 +12,12 @@
   z-index: 1;
   transition: all 0.2s ease;
   text-decoration: none !important;
-  border-bottom: 1px dashed #7c3aed;
+  border-bottom: 1px dashed currentColor;
   pointer-events: auto !important;
 }
 
 .len-word:hover {
-  background: linear-gradient(120deg, rgba(124, 58, 237, 0.2) 0%, rgba(124, 58, 237, 0.1) 100%);
-  color: #6d28d9;
+  background: color-mix(in srgb, currentColor 15%, transparent);
 }
 
 /* 主要文本样式 */
@@ -103,21 +102,14 @@
   animation: len-pulse 1.5s ease-in-out infinite;
 }
 
-/* 暗色模式支持 - 紫色主题 */
+/* 暗色模式支持 */
 @media (prefers-color-scheme: dark) {
   .len-word {
-    color: #a78bfa;
-    background: linear-gradient(120deg, rgba(167, 139, 250, 0.15) 0%, rgba(167, 139, 250, 0.08) 100%);
-    border-bottom-color: #a78bfa;
+    background: rgba(200, 200, 200, 0.1);
   }
 
   .len-word:hover {
-    background: linear-gradient(120deg, rgba(167, 139, 250, 0.25) 0%, rgba(167, 139, 250, 0.15) 100%);
-    color: #c4b5fd;
-  }
-
-  .len-style-original-translation .len-main-text {
-    color: #d1d5db;
+    background: color-mix(in srgb, currentColor 18%, transparent);
   }
 }
 
