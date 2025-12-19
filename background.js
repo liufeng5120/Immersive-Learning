@@ -1,4 +1,4 @@
-// Learn English Naturally - Background Service Worker
+// Immersive Learning - Background Service Worker
 
 // 默认设置
 const DEFAULT_SETTINGS = {
@@ -16,8 +16,43 @@ const DEFAULT_SETTINGS = {
   maxConcurrent: 3,
 };
 
+// 难度配置：根据难度级别选择不同难度的单词
+const DIFFICULTY_CONFIG = {
+  1: {
+    levelName: "基础",
+    description: "最基础的日常高频词汇，初学者或小学生能理解的简单词",
+    guidance: "选择最常用、最简单的词，避免任何书面语、正式用语或专业词汇",
+    quantityGuide: "按句子字数的5%选词，最多不超过2个词",
+  },
+  2: {
+    levelName: "常用",
+    description: "常用词汇，中学生能理解的词",
+    guidance:
+      "选择日常生活和工作中常见的词，避免过于简单的基础词，也避免专业术语",
+    quantityGuide: "按句子字数的8%选词，最多不超过4个词",
+  },
+  3: {
+    levelName: "中级",
+    description: "中级词汇，高中生或大学生能理解的词",
+    guidance: "选择有一定难度的词汇，可包含常见短语，避免太简单或太专业的词",
+    quantityGuide: "按句子字数的12%选词，最多不超过6个词",
+  },
+  4: {
+    levelName: "较难",
+    description: "较难词汇和习语，需要较高语言水平才能理解",
+    guidance: "选择书面语、正式用语、习语和有表达力的词，避免基础常用词",
+    quantityGuide: "按句子字数的15%选词，最多不超过8个词",
+  },
+  5: {
+    levelName: "高级",
+    description: "高级词汇、专业术语、复杂习语和文学表达",
+    guidance: "选择高级词汇、专业术语、复杂习语，不限制难度，避免简单常用词",
+    quantityGuide: "按句子字数的20%选词，无上限限制",
+  },
+};
+
 // 右键菜单 ID
-const MENU_ID = "learn-english-toggle-site";
+const MENU_ID = "immersive-learning-site-filter";
 
 // 扩展安装时初始化
 chrome.runtime.onInstalled.addListener(async () => {
@@ -272,7 +307,9 @@ async function handleTranslateSentence({
   targetLanguage,
 }) {
   const processText = text.length > 500 ? text.substring(0, 500) : text;
-  const count = Math.max(1, Math.min(difficulty, 5));
+
+  // 根据难度获取配置
+  const diffConfig = DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG[3];
 
   const LANGUAGE_NAMES = {
     "zh-CN": "中文",
@@ -290,9 +327,41 @@ async function handleTranslateSentence({
 
   let systemPrompt;
   if (direction === "native-to-target") {
-    systemPrompt = `从${nativeName}句子中选择${count}个常用词返回JSON数组。严格要求：1.选择有学习价值的词语 2.只选名词/动词/形容词 3.不选虚词助词 4.不选人名地名品牌 5.确保词在原文中完整存在 6.只返回JSON：[{"original":"原词","translation":"${targetName}翻译"}]`;
+    systemPrompt = `你是语言学习助手。从${nativeName}句子中选择词语返回JSON数组。
+
+难度级别：${diffConfig.levelName}
+难度说明：${diffConfig.description}
+选词指导：${diffConfig.guidance}
+数量限制：${diffConfig.quantityGuide}
+
+词性原则：根据难度级别自行判断。低难度专注实词（名词、动词、形容词），高难度可选择高级连词、介词短语等有学习价值的词。
+
+严格要求：
+1. 严格遵守数量限制，不要超过上限
+2. 不选人名、地名、品牌名
+3. 确保词在原文中完整存在
+4. 优先选择有学习价值的词
+
+返回格式：[{"original":"原词","translation":"${targetName}翻译"}]
+只返回JSON数组，不要其他内容。`;
   } else {
-    systemPrompt = `From the ${targetName} text, select ${count} common words and return a JSON array. Requirements: 1.Select words valuable for learning 2.Only nouns/verbs/adjectives 3.No function words 4.No proper nouns 5.Word must exist in original text 6.Return only JSON: [{"original":"word","translation":"${nativeName}翻译"}]`;
+    systemPrompt = `You are a language learning assistant. Select words from the ${targetName} text and return a JSON array.
+
+Difficulty Level: ${diffConfig.levelName}
+Level Description: ${diffConfig.description}
+Selection Guidance: ${diffConfig.guidance}
+Quantity Limit: ${diffConfig.quantityGuide}
+
+POS Principle: Decide based on difficulty level. Lower difficulty focuses on content words (nouns, verbs, adjectives). Higher difficulty can include advanced conjunctions, prepositions, and other valuable words.
+
+Requirements:
+1. Strictly follow quantity limits, do not exceed
+2. No proper nouns (names, places, brands)
+3. Word must exist in original text
+4. Prioritize words with learning value
+
+Format: [{"original":"word","translation":"${nativeName}翻译"}]
+Return only JSON array, nothing else.`;
   }
 
   const response = await fetchWithRetry(
@@ -329,9 +398,9 @@ async function handleTranslateSentence({
   if (jsonMatch) {
     try {
       const parsed = JSON.parse(jsonMatch[0]);
-      return parsed
-        .filter((r) => r.original && r.translation && text.includes(r.original))
-        .slice(0, count);
+      return parsed.filter(
+        (r) => r.original && r.translation && text.includes(r.original)
+      );
     } catch (err) {
       console.error("[Background] JSON parse error in translateSentence:", err);
       console.error("[Background] Raw content:", content);

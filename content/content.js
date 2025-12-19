@@ -837,7 +837,7 @@
     document.addEventListener(
       "mouseenter",
       (e) => {
-        if (!e.target || !(e.target instanceof Element)) return;
+        if (!e.target || typeof e.target.closest !== "function") return;
         const wordEl = e.target.closest(".len-word");
         if (!wordEl) return;
 
