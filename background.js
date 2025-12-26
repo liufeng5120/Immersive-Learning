@@ -130,6 +130,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(result);
       })
       .catch((error) => {
+        console.error("[Background] API_TRANSLATE_SENTENCE error:", error);
         sendResponse({ error: error.message });
       });
     return true;
@@ -141,6 +142,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(result);
       })
       .catch((error) => {
+        console.error("[Background] API_GET_WORD_DETAIL error:", error);
         sendResponse({ error: error.message });
       });
     return true;
@@ -297,6 +299,71 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// 修复畸形 JSON（某些模型返回不稳定）
+function repairMalformedJson(str) {
+  // 修复 ["key": "value"] 为 {"key": "value"}
+  let fixed = str.replace(/\[\s*"([^"]+)"\s*:/g, '{"$1":');
+  fixed = fixed.replace(/:\s*"([^"]*)"\s*\]/g, ':"$1"}');
+
+  // 修复 }, { 之间缺少逗号的情况
+  fixed = fixed.replace(/\}\s*\{/g, "},{");
+
+  // 修复最外层缺少方括号的情况
+  const trimmed = fixed.trim();
+  if (trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+    fixed = "[" + trimmed + "]";
+  }
+
+  return fixed;
+}
+
+// 解析翻译结果 JSON
+function parseTranslateResult(content, originalText) {
+  // 清理 markdown 代码块标记
+  content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "");
+
+  let jsonMatch = content.match(/\[[\s\S]*\]/);
+
+  // 尝试匹配连续的对象形式（无外层方括号）
+  if (!jsonMatch) {
+    jsonMatch = content.match(/\{[\s\S]*\}/);
+  }
+
+  if (!jsonMatch) {
+    return { success: false, error: "No JSON found in response" };
+  }
+
+  const jsonStr = jsonMatch[0];
+
+  try {
+    const parsed = JSON.parse(jsonStr);
+    const result = Array.isArray(parsed) ? parsed : [parsed];
+    return {
+      success: true,
+      data: result.filter(
+        (r) => r.original && r.translation && originalText.includes(r.original)
+      ),
+    };
+  } catch (err) {
+    // 尝试修复后再解析
+    try {
+      const repairedJson = repairMalformedJson(jsonStr);
+      const parsed = JSON.parse(repairedJson);
+      const result = Array.isArray(parsed) ? parsed : [parsed];
+      console.log("[Background] Repaired malformed JSON successfully");
+      return {
+        success: true,
+        data: result.filter(
+          (r) =>
+            r.original && r.translation && originalText.includes(r.original)
+        ),
+      };
+    } catch (repairErr) {
+      return { success: false, error: err.message, rawContent: content };
+    }
+  }
+}
+
 // 单句翻译
 async function handleTranslateSentence({
   text,
@@ -327,7 +394,9 @@ async function handleTranslateSentence({
 
   let systemPrompt;
   if (direction === "native-to-target") {
-    systemPrompt = `你是语言学习助手。从${nativeName}句子中选择词语返回JSON数组。
+    systemPrompt = `【重要！禁止思考和推理！】直接返回JSON数组，不要任何思考过程和其他内容。
+
+你是语言学习助手。从${nativeName}句子中选择词语返回JSON数组。
 
 难度级别：${diffConfig.levelName}
 难度说明：${diffConfig.description}
@@ -343,9 +412,11 @@ async function handleTranslateSentence({
 4. 优先选择有学习价值的词
 
 返回格式：[{"original":"原词","translation":"${targetName}翻译"}]
-只返回JSON数组，不要其他内容。`;
+再次强调：直接返回JSON数组，禁止思考推理和额外说明。`;
   } else {
-    systemPrompt = `You are a language learning assistant. Select words from the ${targetName} text and return a JSON array.
+    systemPrompt = `【IMPORTANT! NO THINKING OR REASONING!】Return JSON array directly, no thinking process or extra content.
+
+You are a language learning assistant. Select words from the ${targetName} text and return a JSON array.
 
 Difficulty Level: ${diffConfig.levelName}
 Level Description: ${diffConfig.description}
@@ -361,52 +432,94 @@ Requirements:
 4. Prioritize words with learning value
 
 Format: [{"original":"word","translation":"${nativeName}翻译"}]
-Return only JSON array, nothing else.`;
+Reminder: Return JSON array directly, no thinking or explanation.`;
   }
 
-  const response = await fetchWithRetry(
-    `${config.apiBaseUrl}/v1/chat/completions`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: config.model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: processText },
-        ],
-        temperature: 0.3,
-        max_tokens: 300,
-      }),
+  // 单次 API 调用尝试
+  async function attemptTranslate() {
+    const response = await fetchWithRetry(
+      `${config.apiBaseUrl}/v1/chat/completions`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: config.model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: processText },
+          ],
+          temperature: 0.3,
+          reasoning_effort: "low",
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      const errorDetails = {
+        status: response.status,
+        statusText: response.statusText,
+        url: `${config.apiBaseUrl}/v1/chat/completions`,
+        response: errorText,
+      };
+      throw errorDetails;
     }
-  );
 
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
+    const data = await response.json();
+
+    // 检查响应数据结构
+    if (!data?.choices?.[0]?.message?.content) {
+      console.warn("[Background] API 响应数据结构异常，跳过该条");
+      return { success: false, error: "响应数据结构异常" };
+    }
+
+    return parseTranslateResult(data.choices[0].message.content.trim(), text);
   }
 
-  const data = await response.json();
-  let content = data.choices[0].message.content.trim();
-
-  // 清理 markdown 代码块标记
-  content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "");
-
-  const jsonMatch = content.match(/\[[\s\S]*\]/);
-  if (jsonMatch) {
+  // 解析失败重试机制
+  const maxParseRetries = 2;
+  for (let attempt = 0; attempt <= maxParseRetries; attempt++) {
     try {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return parsed.filter(
-        (r) => r.original && r.translation && text.includes(r.original)
-      );
+      const result = await attemptTranslate();
+
+      if (result.success) {
+        return result.data;
+      }
+
+      // 解析失败，记录并重试
+      if (attempt < maxParseRetries) {
+        console.warn(
+          `[Background] JSON parse failed (attempt ${attempt + 1}/${
+            maxParseRetries + 1
+          }), retrying...`
+        );
+        console.warn("[Background] Raw content:", result.rawContent);
+        await sleep(500);
+      } else {
+        console.error(
+          "[Background] JSON parse error after all retries:",
+          result.error
+        );
+        console.error("[Background] Raw content:", result.rawContent);
+        return [];
+      }
     } catch (err) {
-      console.error("[Background] JSON parse error in translateSentence:", err);
-      console.error("[Background] Raw content:", content);
-      return [];
+      // 返回详细错误信息给 content.js
+      // err 本身就是 errorDetails 对象（包含 status, statusText, url, response）
+      return {
+        error: true,
+        status: err.status,
+        statusText: err.statusText,
+        url: err.url,
+        response: err.response,
+        fullError: err,
+      };
     }
   }
+
   return [];
 }
 
@@ -425,13 +538,17 @@ async function handleGetWordDetail({ english, chinese, context, config }) {
         messages: [
           {
             role: "system",
-            content: `你是英语词典助手。根据给定的英文单词和中文原词，返回JSON格式的单词详情。要求：
+            content: `【重要！禁止思考和推理！】直接返回JSON对象，不要任何思考过程。
+
+你是英语词典助手。根据给定的英文单词和中文原词，返回JSON格式的单词详情。要求：
 1. phonetic: 国际音标（如 /ˈeksəmpəl/）
 2. pos: 词性缩写（如 n. v. adj. adv.）
 3. meaning: 中文释义（简洁，1-2个含义）
 4. example_en: 一个简单的英文例句
 5. example_zh: 例句的中文翻译
-只返回JSON对象，格式：{"phonetic":"...","pos":"...","meaning":"...","example_en":"...","example_zh":"..."}`,
+
+返回格式：{"phonetic":"...","pos":"...","meaning":"...","example_en":"...","example_zh":"..."}
+再次强调：直接返回JSON对象，禁止思考推理。`,
           },
           {
             role: "user",
@@ -439,22 +556,58 @@ async function handleGetWordDetail({ english, chinese, context, config }) {
           },
         ],
         temperature: 0.3,
-        max_tokens: 300,
+        reasoning_effort: "low",
       }),
     }
   );
 
   if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
+    const errorText = await response.text();
+    return {
+      error: true,
+      errorDetails: {
+        status: response.status,
+        statusText: response.statusText,
+        url: `${config.apiBaseUrl}/v1/chat/completions`,
+        response: errorText,
+      },
+      message: errorText,
+    };
   }
 
   const data = await response.json();
-  let content = data.choices[0].message.content.trim();
+
+  // 打印完整响应用于调试
+  console.log("[Background] 单词详情 API 响应:", JSON.stringify(data, null, 2));
+
+  // 检查响应数据结构
+  if (!data || !data.choices || !data.choices[0] || !data.choices[0].message) {
+    console.error("[Background] 单词详情 API 响应数据结构异常:", data);
+    return {
+      error: true,
+      message: "API 响应数据结构异常",
+      rawData: data,
+    };
+  }
+
+  const content = data.choices[0].message.content;
+  if (!content) {
+    console.error("[Background] 单词详情 API 返回的 content 为空:", data);
+    return {
+      error: true,
+      message: "API 返回的 content 为空",
+      rawData: data,
+    };
+  }
+
+  let trimmedContent = content.trim();
 
   // 清理 markdown 代码块标记
-  content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "");
+  trimmedContent = trimmedContent
+    .replace(/```json\s*/g, "")
+    .replace(/```\s*/g, "");
 
-  const jsonMatch = content.match(/\{[\s\S]*?\}/);
+  const jsonMatch = trimmedContent.match(/\{[\s\S]*?\}/);
   if (jsonMatch) {
     try {
       return JSON.parse(jsonMatch[0]);

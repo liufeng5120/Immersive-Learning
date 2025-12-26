@@ -335,7 +335,12 @@
         });
 
         if (result.error) {
-          console.error("[Immersive Learning] API error:", result.error);
+          console.error("[Immersive Learning] API 请求失败:", {
+            status: result.status,
+            statusText: result.statusText,
+            url: result.url,
+            response: result.response,
+          });
           handleApiError();
           return [];
         }
@@ -380,11 +385,13 @@
           },
         });
 
-        if (result.error) {
-          console.error(
-            "[Immersive Learning] Word detail error:",
-            result.error
-          );
+        if (result && result.error) {
+          console.error("[Immersive Learning] 单词详情请求失败:", {
+            status: result.status,
+            statusText: result.statusText,
+            url: result.url,
+            response: result.response,
+          });
           return null;
         }
 
@@ -874,7 +881,7 @@
     );
   }
 
-  // 监听设置变化（开关同步）
+  // 监听设置变化（开关同步 + API 配置同步）
   function listenForSettingsChanges() {
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "local" || !changes.settings) return;
@@ -883,15 +890,21 @@
       const wasEnabled = settings.enabled;
       settings = { ...settings, ...newSettings };
 
+      // 同步更新 AIProcessor.config（确保 API 配置实时生效）
+      if (settings.apiKey) {
+        AIProcessor.config.apiKey = settings.apiKey;
+        AIProcessor.config.apiBaseUrl =
+          settings.apiBaseUrl || "https://api.openai.com";
+        AIProcessor.config.model = settings.modelName || "gpt-4o-mini";
+        AIProcessor.config.nativeLanguage = settings.nativeLanguage || "zh-CN";
+        AIProcessor.config.targetLanguage = settings.targetLanguage || "en";
+      }
+
       // 开关状态变化
       if (wasEnabled && !settings.enabled) {
         stopObserving();
         showPageToast("沉浸式学习已关闭", 2000);
       } else if (!wasEnabled && settings.enabled && settings.apiKey) {
-        AIProcessor.config.apiKey = settings.apiKey;
-        AIProcessor.config.apiBaseUrl =
-          settings.apiBaseUrl || "https://api.openai.com";
-        AIProcessor.config.model = settings.modelName || "gpt-4o-mini";
         apiErrorCount = 0;
         observeDOM();
         processPage();
